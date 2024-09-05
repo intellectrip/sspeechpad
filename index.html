@@ -678,5 +678,24 @@ window.speechSynthesis.onvoiceschanged = function() {
   synth.getVoices();
 };
 </script>
+
+<div style="position: fixed; bottom: 10px; right: 10px; text-align: right; background-color: rgba(255,255,255,0.8); padding: 10px; border-radius: 5px; max-width: 300px;">
+  <p style="font-size: 14px; margin-bottom: 5px;">Your support, even a few cents, helps keep this app free. Thank you for being awesome! Peace and goodwill to all.</p>
+  <p style="font-size: 12px; margin-bottom: 5px; word-break: break-all;">ETH address: 0x896d8d26417DfeE7a49B75aa68ac40A23E7F5F2c</p>
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=ethereum:0x896d8d26417DfeE7a49B75aa68ac40A23E7F5F2c" alt="QR Code" style="margin-bottom: 5px;">
+  <button onclick="donateETH()" style="padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; margin-bottom: 5px; width: 100%;">
+    Donate with MetaMask
+  </button>
+  <p style="font-size: 12px;">No MetaMask? Use the QR code or copy the address above to donate from any ETH wallet.</p>
+</div>
+
+<script>
+function donateETH() {
+  const address = "0x896d8d26417DfeE7a49B75aa68ac40A23E7F5F2c";
+  const url = `https://metamask.app.link/send/eth?address=${address}`;
+  window.open(url, '_blank');
+}
+</script>
+
 </body>
 </html>
