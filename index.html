@@ -1,0 +1,682 @@
+<html><head><base href="https://websim.example.com/">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enhanced Universal Keyboard with Voice Input</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    padding: 20px;
+    background-color: #333333; /* Dark gray background */
+    color: #f0f0f0; /* Light text color for better contrast */
+  }
+  body.inverted {
+    filter: invert(1) hue-rotate(180deg);
+    background-color: #cccccc; /* Light gray when inverted */
+  }
+  body.sepia {
+    filter: sepia(1);
+    background-color: #d2b48c; /* Sepia tone */
+  }
+  #colorSchemeBtn {
+    background-color: #9C27B0;
+  }
+  #colorSchemeBtn:hover {
+    background-color: #7B1FA2;
+  }
+  .left-panel {
+    width: 150px;
+    margin-right: 20px;
+  }
+  .main-panel {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  #textArea {
+    width: 100%;
+    height: 400px;
+    max-height: 80vh;
+    margin-bottom: 20px;
+    padding: 10px;
+    font-size: 18px;
+    background-color: #444444; /* Darker background for text area */
+    color: #f0f0f0; /* Light text color for better contrast */
+    border: 1px solid #555; /* Slightly lighter border */
+  }
+  #charCount {
+    font-size: 14px;
+    color: #f0f0f0;
+    margin-bottom: 10px;
+  }
+  .keyboard-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .keyboard {
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+    gap: 8px;
+  }
+  .key {
+    width: 50px;
+    height: 50px;
+    font-size: 18px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #4a4a4a; /* Darker keys for contrast */
+    color: #f0f0f0; /* Light text color for keys */
+    border: 1px solid #555; /* Slightly lighter border */
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .key:hover {
+    background-color: #5a5a5a; /* Lighter on hover */
+  }
+  .wide {
+    grid-column: span 2;
+    width: 108px;
+  }
+  .controls {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .control-btn {
+    padding: 12px 24px;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .control-btn:hover {
+    background-color: #45a049;
+  }
+  #micBtn {
+    background-color: #4CAF50;
+    width: 120px;
+    height: 240px;
+    font-size: 24px;
+    margin-bottom: 20px;
+  }
+  #micBtn.recording {
+    background-color: #f44336;
+  }
+  .left-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .left-control-btn {
+    width: 58px;
+    height: 50px;
+    font-size: 18px;
+    background-color: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .left-control-btn:hover {
+    background-color: #1976D2;
+  }
+  .btn-pair {
+    display: flex;
+    gap: 6px;
+  }
+  .language-select {
+    padding: 12px;
+    font-size: 16px;
+    margin-top: 10px;
+  }
+  .language-label {
+    font-size: 14px;
+    margin-top: 5px;
+    text-align: center;
+  }
+  .language-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  #speedControl {
+    width: 100px;
+    vertical-align: middle;
+  }
+  #speedValue {
+    display: inline-block;
+    width: 30px;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="left-panel">
+  <button class="control-btn" id="micBtn">Mic</button>
+  <div class="left-controls">
+    <div class="btn-pair">
+      <button class="left-control-btn" onclick="insertAtCursor('.')">.</button>
+      <button class="left-control-btn" onclick="insertAtCursor(',')">,</button>
+    </div>
+    <div class="btn-pair">
+      <button class="left-control-btn" onclick="insertAtCursor(' ')">Space</button>
+      <button class="left-control-btn" onclick="backspace()">⌫</button>
+    </div>
+    <div class="btn-pair">
+      <button class="left-control-btn" id="capitalizeBtn">Aa</button>
+      <button class="left-control-btn" id="undoBtn">↩</button>
+    </div>
+  </div>
+</div>
+<div class="main-panel">
+  <div id="charCount">Characters: 0</div>
+  <textarea id="textArea" placeholder="Enter text here..."></textarea>
+  <div class="controls">
+    <button class="control-btn" id="toggleKeyboard">Change</button>
+    <button class="control-btn" id="translateBtn">Translate</button>
+    <button class="control-btn" id="copyToSearchBtn">Copy to search</button>
+    <button class="control-btn" id="colorSchemeBtn">Color Scheme</button>
+    <button class="control-btn" id="speakBtn">Speak</button>
+    <button class="control-btn" id="finalCheckBtn">Final Check</button>
+    <input type="range" id="speedControl" min="0.5" max="4" step="0.1" value="2">
+    <label for="speedControl">Speed: <span id="speedValue">2</span>x</label>
+  </div>
+  <div class="keyboard-container">
+    <div class="keyboard" id="keyboard"></div>
+    <div class="language-controls">
+      <select id="voiceLanguage" class="language-select">
+        <option value="ru-RU">Russian</option>
+        <option value="en-US">English (US)</option>
+        <option value="es-ES">Spanish</option>
+        <option value="fr-FR">French</option>
+        <option value="de-DE">German</option>
+        <option value="it-IT">Italian</option>
+        <option value="pt-PT">Portuguese</option>
+        <option value="nl-NL">Dutch</option>
+        <option value="pl-PL">Polish</option>
+        <option value="zh-CN">Chinese (Simplified)</option>
+        <option value="ja-JP">Japanese</option>
+        <option value="ko-KR">Korean</option>
+      </select>
+      <select id="translateFrom" class="language-select">
+        <option value="ru">Russian</option>
+        <option value="en">English</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="it">Italian</option>
+        <option value="pt">Portuguese</option>
+        <option value="nl">Dutch</option>
+        <option value="pl">Polish</option>
+        <option value="zh">Chinese</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+      </select>
+      <select id="translateTo" class="language-select">
+        <option value="en">English</option>
+        <option value="ru">Russian</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="de">German</option>
+        <option value="it">Italian</option>
+        <option value="pt">Portuguese</option>
+        <option value="nl">Dutch</option>
+        <option value="pl">Polish</option>
+        <option value="zh">Chinese</option>
+        <option value="ja">Japanese</option>
+        <option value="ko">Korean</option>
+      </select>
+      <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+      <button class="control-btn" id="uploadImageBtn">Upload Image</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const keyboards = {
+  ru: [
+    '1','2','3','4','5','6','7','8','9','0','-','=','?','!',
+    'й','ц','у','к','е','н','г','ш','щ','з','х','ъ','\\','/',
+    'ф','ы','в','а','п','р','о','л','д','ж','э',';','\'',':',
+    'я','ч','с','м','и','т','ь','б','ю','.',',','(',')','"',
+    '@','#','$','%','^','&','*','_','+','[',']','{','}'
+  ],
+  en: [
+    '1','2','3','4','5','6','7','8','9','0','-','=','?','!',
+    'q','w','e','r','t','y','u','i','o','p','[',']','\\','/',
+    'a','s','d','f','g','h','j','k','l',';','\'',':','"',
+    'z','x','c','v','b','n','m',',','.','/','(',')',
+    '@','#','$','%','^','&','*','_','+','{','}','<','>'
+  ],
+};
+
+let currentKeyboardLanguage = 'ru';
+let currentVoiceLanguage = 'ru-RU';
+let recognition;
+let lastTranslatedText = '';
+let lastOriginalText = '';
+let textHistory = [''];
+let currentHistoryIndex = 0;
+let currentColorScheme = 'normal';
+let synth = window.speechSynthesis;
+let currentUtterance = null;
+let isPaused = false;
+let pausedPosition = 0;
+
+function saveTextState() {
+  const textArea = document.getElementById('textArea');
+  if (textArea.value !== textHistory[currentHistoryIndex]) {
+    currentHistoryIndex++;
+    textHistory = textHistory.slice(0, currentHistoryIndex);
+    textHistory.push(textArea.value);
+    if (textHistory.length > 50) {
+      textHistory.shift();
+      currentHistoryIndex--;
+    }
+  }
+}
+
+function updateCharCount() {
+  const textArea = document.getElementById('textArea');
+  const charCount = document.getElementById('charCount');
+  charCount.textContent = `Characters: ${textArea.value.length}`;
+}
+
+function createKeyboard() {
+  const keyboard = document.getElementById('keyboard');
+  keyboard.innerHTML = '';
+  keyboards[currentKeyboardLanguage].forEach(key => {
+    const keyElement = document.createElement('button');
+    keyElement.textContent = key;
+    keyElement.className = 'key';
+    keyElement.onclick = () => insertAtCursor(key);
+    keyboard.appendChild(keyElement);
+  });
+  const spaceKey = document.createElement('button');
+  spaceKey.textContent = 'Space';
+  spaceKey.className = 'key wide';
+  spaceKey.onclick = () => insertAtCursor(' ');
+  keyboard.appendChild(spaceKey);
+}
+
+function insertAtCursor(text) {
+  const textArea = document.getElementById('textArea');
+  const { selectionStart: start, selectionEnd: end, value } = textArea;
+  
+  saveTextState();
+  
+  textArea.value = value.substring(0, start) + text + value.substring(end);
+  textArea.selectionStart = textArea.selectionEnd = start + text.length;
+  textArea.focus();
+  
+  updateCharCount();
+}
+
+function backspace() {
+  const textArea = document.getElementById('textArea');
+  const { selectionStart: start, selectionEnd: end, value } = textArea;
+  
+  saveTextState();
+  
+  if (start === end && start > 0) {
+    textArea.value = value.slice(0, start - 1) + value.slice(end);
+    textArea.selectionStart = textArea.selectionEnd = start - 1;
+  } else {
+    textArea.value = value.slice(0, start) + value.slice(end);
+    textArea.selectionStart = textArea.selectionEnd = start;
+  }
+  
+  textArea.focus();
+  
+  updateCharCount();
+}
+
+document.getElementById('finalCheckBtn').onclick = () => {
+  const textArea = document.getElementById('textArea');
+  let text = textArea.value;
+  
+  // Basic punctuation and capitalization fixes
+  text = text.replace(/\s+/g, ' '); // Remove extra spaces
+  text = text.replace(/\s*([.,!?:;])\s*/g, '$1 '); // Fix spacing around punctuation
+  text = text.replace(/\s+([.,!?:;])/g, '$1'); // Remove space before punctuation
+  text = text.replace(/([.!?])\s*([a-zа-я])/gi, (match, p1, p2) => p1 + ' ' + p2.toUpperCase()); // Capitalize after sentence-ending punctuation
+  
+  // Capitalize first letter of the text
+  text = text.charAt(0).toUpperCase() + text.slice(1);
+  
+  textArea.value = text;
+  updateCharCount();
+};
+
+document.getElementById('undoBtn').onclick = () => {
+  if (currentHistoryIndex > 0) {
+    currentHistoryIndex--;
+    const textArea = document.getElementById('textArea');
+    textArea.value = textHistory[currentHistoryIndex];
+    textArea.selectionStart = textArea.selectionEnd = textArea.value.length;
+    textArea.focus();
+    updateCharCount();
+  }
+};
+
+document.getElementById('toggleKeyboard').onclick = () => {
+  if (currentHistoryIndex < textHistory.length - 1) {
+    // Redo operation
+    currentHistoryIndex++;
+    const textArea = document.getElementById('textArea');
+    textArea.value = textHistory[currentHistoryIndex];
+    textArea.selectionStart = textArea.selectionEnd = textArea.value.length;
+    textArea.focus();
+    updateCharCount();
+  } else {
+    // Original keyboard toggle functionality
+    currentKeyboardLanguage = currentKeyboardLanguage === 'ru' ? 'en' : 'ru';
+    createKeyboard();
+    
+    // Swap translation languages
+    const translateFrom = document.getElementById('translateFrom');
+    const translateTo = document.getElementById('translateTo');
+    const temp = translateFrom.value;
+    translateFrom.value = translateTo.value;
+    translateTo.value = temp;
+  }
+};
+
+document.getElementById('capitalizeBtn').onclick = () => {
+  const textArea = document.getElementById('textArea');
+  const start = textArea.selectionStart;
+  const before = textArea.value.substring(0, start);
+  const after = textArea.value.substring(start);
+  if (after.length > 0) {
+    saveTextState();
+    const char = after[0];
+    const newChar = char === char.toUpperCase() ? char.toLowerCase() : char.toUpperCase();
+    textArea.value = before + newChar + after.slice(1);
+    textArea.selectionStart = textArea.selectionEnd = start + 1;
+    updateCharCount();
+  }
+  textArea.focus();
+};
+
+document.getElementById('translateBtn').onclick = async () => {
+  const textArea = document.getElementById('textArea');
+  const text = textArea.value;
+  
+  if (text === lastTranslatedText) {
+    textArea.value = lastOriginalText;
+    lastTranslatedText = '';
+    lastOriginalText = '';
+    updateCharCount();
+    return;
+  }
+  
+  const sourceLang = document.getElementById('translateFrom').value;
+  const targetLang = document.getElementById('translateTo').value;
+  
+  try {
+    const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}&de=youremail@example.com`);
+    const data = await response.json();
+    if (data.responseData) {
+      saveTextState();
+      lastOriginalText = text;
+      lastTranslatedText = data.responseData.translatedText;
+      textArea.value = lastTranslatedText;
+      updateCharCount();
+    } else {
+      throw new Error('Translation error');
+    }
+  } catch (error) {
+    console.error('Error during translation:', error);
+    alert('An error occurred while attempting to translate. Please try again.');
+  }
+  textArea.focus();
+};
+
+document.getElementById('copyToSearchBtn').onclick = () => {
+  const text = document.getElementById('textArea').value;
+  const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(text)}`;
+  window.open(searchUrl, '_blank');
+};
+
+const micBtn = document.getElementById('micBtn');
+micBtn.style.backgroundColor = '#4CAF50'; // Green when not recording
+
+micBtn.onclick = () => {
+  const textArea = document.getElementById('textArea');
+
+  if (micBtn.classList.contains('recording')) {
+    micBtn.classList.remove('recording');
+    micBtn.style.backgroundColor = '#4CAF50'; // Green when not recording
+    micBtn.textContent = 'Mic';
+    recognition.stop();
+    saveTextState(); // Save state when stopping recording
+  } else {
+    micBtn.classList.add('recording');
+    micBtn.style.backgroundColor = '#f44336'; // Red when recording
+    micBtn.textContent = 'Stop';
+    
+    saveTextState(); // Save state before starting new recording
+    
+    if (!recognition) {
+      recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = currentVoiceLanguage;
+      recognition.interimResults = true;
+      recognition.continuous = true;
+
+      recognition.onresult = (event) => {
+        const result = event.results[event.results.length - 1];
+        const transcript = result[0].transcript;
+        const isFinal = result.isFinal;
+
+        if (isFinal) {
+          const start = textArea.selectionStart;
+          const end = textArea.selectionEnd;
+          const text = textArea.value;
+          const before = text.substring(0, start);
+          const after = text.substring(end);
+          let formattedTranscript = transcript.trim();
+          formattedTranscript = formattedTranscript.replace(/([.,!?:;])(\S)/g, '$1 $2');
+          if (before.length > 0 && !/\s$/.test(before)) {
+            formattedTranscript = ' ' + formattedTranscript;
+          }
+          textArea.value = before + formattedTranscript + after;
+          textArea.selectionStart = textArea.selectionEnd = start + formattedTranscript.length;
+          updateCharCount(); // Save state after inserting dictated text
+          saveTextState(); // Save state after inserting dictated text
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        micBtn.classList.remove('recording');
+        micBtn.style.backgroundColor = '#4CAF50'; // Green when not recording
+        micBtn.textContent = 'Mic';
+      };
+
+      recognition.onend = () => {
+        micBtn.classList.remove('recording');
+        micBtn.style.backgroundColor = '#4CAF50'; // Green when not recording
+        micBtn.textContent = 'Mic';
+      };
+    }
+
+    recognition.lang = currentVoiceLanguage;
+    recognition.start();
+  }
+  textArea.focus();
+};
+
+document.getElementById('uploadImageBtn').onclick = () => {
+  document.getElementById('imageUpload').click();
+};
+
+document.getElementById('imageUpload').onchange = async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const worker = await Tesseract.createWorker();
+          await worker.load();
+          await worker.loadLanguage('eng+rus');
+          await worker.initialize('eng+rus');
+          const { data: { text } } = await worker.recognize(img);
+          await worker.terminate();
+          
+          const textArea = document.getElementById('textArea');
+          saveTextState();
+          textArea.value = text; // Replace entire content with OCR result
+          updateCharCount(); // Update character count
+          textArea.selectionStart = textArea.selectionEnd = textArea.value.length;
+          textArea.focus();
+        } catch (error) {
+          console.error('Error during OCR:', error);
+          alert('An error occurred while processing the image. Please try again.');
+        }
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
+createKeyboard();
+
+// Ensure cursor stays at the end of input after any action
+document.getElementById('textArea').addEventListener('input', function() {
+  this.selectionStart = this.selectionEnd = this.value.length;
+  updateCharCount(); 
+});
+
+// Add space after punctuation when typing
+document.getElementById('textArea').addEventListener('input', function(e) {
+  if (e.inputType === 'insertText' && /[.,!?:;]/.test(e.data)) {
+    const pos = this.selectionStart;
+    if (pos < this.value.length && !/\s/.test(this.value[pos])) {
+      const before = this.value.slice(0, pos);
+      const after = this.value.slice(pos);
+      this.value = before + ' ' + after;
+      this.selectionStart = this.selectionEnd = pos + 1;
+      updateCharCount();
+    }
+  }
+});
+
+document.getElementById('colorSchemeBtn').onclick = () => {
+  const body = document.body;
+  body.classList.remove('inverted', 'sepia');
+  
+  switch (currentColorScheme) {
+    case 'normal':
+      body.classList.add('inverted');
+      currentColorScheme = 'inverted';
+      break;
+    case 'inverted':
+      body.classList.add('sepia');
+      currentColorScheme = 'sepia';
+      break;
+    case 'sepia':
+      currentColorScheme = 'normal';
+      break;
+  }
+};
+
+function getMostModernRussianVoice() {
+  let voices = synth.getVoices().filter(voice => voice.lang === 'ru-RU');
+  if (voices.length === 0) return null;
+  
+  voices.sort((a, b) => {
+    if (a.voiceURI && b.voiceURI) {
+      return b.voiceURI.localeCompare(a.voiceURI);
+    }
+    return 0;
+  });
+  
+  return voices[0];
+}
+
+document.getElementById('speakBtn').onclick = () => {
+  const textArea = document.getElementById('textArea');
+  const text = textArea.value;
+  const speed = parseFloat(document.getElementById('speedControl').value);
+
+  if (synth.speaking) {
+    if (isPaused) {
+      // Resume speech
+      isPaused = false;
+      synth.resume();
+    } else {
+      // Pause speech
+      isPaused = true;
+      pausedPosition = textArea.selectionStart;
+      synth.pause();
+    }
+  } else {
+    if (text) {
+      const utterance = new SpeechSynthesisUtterance(text.substring(pausedPosition));
+      utterance.rate = speed;
+      
+      const detectedLang = detectLanguage(text);
+      utterance.lang = detectedLang;
+      
+      if (detectedLang === 'ru-RU') {
+        const russianVoice = getMostModernRussianVoice();
+        if (russianVoice) {
+          utterance.voice = russianVoice;
+        }
+        utterance.rate = Math.min(speed * 2, 4);
+      }
+
+      utterance.onend = () => {
+        currentUtterance = null;
+        isPaused = false;
+        pausedPosition = 0;
+      };
+
+      currentUtterance = utterance;
+      synth.speak(utterance);
+    }
+  }
+};
+
+// Add this event listener to update pausedPosition when the cursor moves
+document.getElementById('textArea').addEventListener('selectionchange', () => {
+  if (isPaused) {
+    pausedPosition = document.getElementById('textArea').selectionStart;
+  }
+});
+
+document.getElementById('speedControl').oninput = (e) => {
+  document.getElementById('speedValue').textContent = e.target.value;
+};
+
+function detectLanguage(text) {
+  const firstChar = text.trim()[0];
+  const code = firstChar.charCodeAt(0);
+  
+  if (code >= 0x0400 && code <= 0x04FF) return 'ru-RU';
+  if (code >= 0x0000 && code <= 0x007F) return 'en-US';
+  if (code >= 0x0600 && code <= 0x06FF) return 'ar-SA';
+  if (code >= 0x3040 && code <= 0x309F) return 'ja-JP';
+  if (code >= 0x4E00 && code <= 0x9FFF) return 'zh-CN';
+  
+  return 'en-US';
+}
+
+window.speechSynthesis.onvoiceschanged = function() {
+  synth.getVoices();
+};
+</script>
+</body>
+</html>
